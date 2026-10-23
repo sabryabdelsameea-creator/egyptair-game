@@ -2,145 +2,338 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>محاكي طيران مصر للطيران - 3D Flight Sim</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>محاكي مصر للطيران 3D - High Graphics</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
-        #ui { position: absolute; top: 15px; right: 15px; left: 15px; z-index: 100; display: flex; justify-content: space-between; pointer-events: none; }
-        .panel { background: rgba(0, 0, 0, 0.75); color: #fff; padding: 12px; border-radius: 10px; border: 1px solid #D4AF37; pointer-events: auto; }
-        button { background: #D4AF37; color: #002D62; border: none; padding: 10px 15px; font-weight: bold; border-radius: 5px; cursor: pointer; margin-top: 5px; width: 100%; }
-        #controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; gap: 10px; pointer-events: auto; }
-        .ctrl-btn { background: rgba(0, 45, 98, 0.8); color: white; border: 1px solid #D4AF37; width: 60px; height: 60px; border-radius: 50%; font-size: 20px; font-weight: bold; }
+        * { box-sizing: border-box; user-select: none; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top:0; left:0; }
+        
+        /* HUD & UI */
+        #hud { position: absolute; top: 15px; left: 15px; right: 15px; z-index: 10; display: flex; justify-content: space-between; pointer-events: none; }
+        .hud-card { background: rgba(5, 15, 35, 0.85); backdrop-filter: blur(8px); border: 1px solid rgba(212, 175, 55, 0.6); color: #fff; padding: 12px 18px; border-radius: 12px; pointer-events: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+        .title { color: #D4AF37; font-weight: bold; font-size: 16px; margin-bottom: 5px; display: flex; align-items: center; gap: 8px; }
+        .val { font-size: 20px; font-weight: bold; color: #4deaea; }
+        
+        .btn-action { background: linear-gradient(135deg, #D4AF37, #AA7C11); color: #001f3f; border: none; padding: 10px 16px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 8px; width: 100%; transition: all 0.2s; box-shadow: 0 4px 15px rgba(212,175,55,0.4); }
+        .btn-action:active { transform: scale(0.96); }
+        
+        /* Controls */
+        #controls-panel { position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; gap: 15px; pointer-events: auto; background: rgba(0,0,0,0.5); padding: 10px 20px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.1); }
+        .ctrl-btn { background: linear-gradient(145deg, #002D62, #001A38); color: #D4AF37; border: 2px solid #D4AF37; width: 65px; height: 65px; border-radius: 50%; font-size: 24px; font-weight: bold; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,0.6); }
+        .ctrl-btn:active { background: #D4AF37; color: #002D62; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
-    <div id="ui">
-        <div class="panel">
-            <h3 style="margin:0; color:#D4AF37;">✈️ مصر للطيران</h3>
-            <p id="status" style="margin:5px 0;">الوضعية: عند البوابة (Gate)</p>
-            <button id="mainBtn" onclick="nextStage()">بدء صعود الركاب (Boarding)</button>
+    <div id="canvas-container"></div>
+
+    <div id="hud">
+        <div class="hud-card">
+            <div class="title">✈️ مصر للطيران - EGYPTAIR</div>
+            <div id="status-text" style="font-size:13px; color:#ccc;">الوضعية: بوابة المطار (Gate 4)</div>
+            <button id="mainActionBtn" class="btn-action" onclick="handleBoarding()">بدء صعود الركاب 👥</button>
         </div>
-        <div class="panel">
-            <p style="margin:2px 0;">السرعة: <span id="spd">0</span> عقدة</p>
-            <p style="margin:2px 0;">الارتفاع: <span id="alt">0</span> قدم</p>
+        <div class="hud-card" style="min-width: 140px; text-align: center;">
+            <div style="font-size: 11px; color: #aaa;">السرعة AIRSPEED</div>
+            <div class="val"><span id="spdVal">0</span> <span style="font-size:12px;">KTS</span></div>
+            <div style="font-size: 11px; color: #aaa; margin-top:5px;">الارتفاع ALTITUDE</div>
+            <div class="val" style="color:#2ecc71;"><span id="altVal">0</span> <span style="font-size:12px;">FT</span></div>
         </div>
     </div>
 
-    <div id="controls">
-        <button class="ctrl-btn" onclick="steer(-0.05)">◀</button>
-        <button class="ctrl-btn" onclick="throttleUp()">▲</button>
-        <button class="ctrl-btn" onclick="steer(0.05)">▶</button>
+    <div id="controls-panel">
+        <button class="ctrl-btn" onclick="steer(-0.04)">◀</button>
+        <button class="ctrl-btn" onclick="addThrottle()" style="border-color:#2ecc71; color:#2ecc71;">▲</button>
+        <button class="ctrl-btn" onclick="steer(0.04)">▶</button>
     </div>
 
     <script>
+        // --- THREE.JS ENGINE SETUP ---
+        const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb);
-        scene.fog = new THREE.FogExp2(0x87ceeb, 0.002);
+        scene.background = new THREE.Color(0x7ec0ee);
+        scene.fog = new THREE.FogExp2(0x7ec0ee, 0.0008);
 
-        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 4000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.shadowMap.enabled = true;
-        document.body.appendChild(renderer.domElement);
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        container.appendChild(renderer.domElement);
 
-        const light = new THREE.DirectionalLight(0xffffff, 1.2);
-        light.position.set(100, 150, 50);
-        light.castShadow = true;
-        scene.add(light);
-        scene.add(new THREE.AmbientLight(0x666666));
+        // --- LIGHTING & SUN ---
+        const dirLight = new THREE.DirectionalLight(0xfffaed, 2.5);
+        dirLight.position.set(200, 300, 150);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 10;
+        dirLight.shadow.camera.far = 800;
+        dirLight.shadow.camera.left = -150;
+        dirLight.shadow.camera.right = 150;
+        dirLight.shadow.camera.top = 150;
+        dirLight.shadow.camera.bottom = -150;
+        scene.add(dirLight);
 
-        const seaGeo = new THREE.PlaneGeometry(2000, 2000);
-        const seaMat = new THREE.MeshPhongMaterial({ color: 0x006699, shininess: 80 });
+        const ambientLight = new THREE.AmbientLight(0x88abdc, 1.2);
+        scene.add(ambientLight);
+
+        // --- OCEAN REALISTIC SHADER MATERIAL ---
+        const seaGeo = new THREE.PlaneGeometry(5000, 5000, 64, 64);
+        const seaMat = new THREE.MeshStandardMaterial({
+            color: 0x004466,
+            roughness: 0.1,
+            metalness: 0.8,
+            flatShading: true
+        });
         const sea = new THREE.Mesh(seaGeo, seaMat);
         sea.rotation.x = -Math.PI / 2;
-        sea.position.y = -1;
+        sea.position.y = -2;
         scene.add(sea);
 
-        const runwayGeo = new THREE.PlaneGeometry(80, 800);
-        const runwayMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        // --- AIRPORT RUNWAY & TERMINAL ---
+        const airportGroup = new THREE.Group();
+        
+        // Runway
+        const runwayGeo = new THREE.PlaneGeometry(120, 1500);
+        const runwayMat = new THREE.MeshStandardMaterial({ color: 0x1f1f1f, roughness: 0.8 });
         const runway = new THREE.Mesh(runwayGeo, runwayMat);
         runway.rotation.x = -Math.PI / 2;
-        runway.position.set(0, 0, 0);
-        scene.add(runway);
+        runway.receiveShadow = true;
+        airportGroup.add(runway);
 
+        // Runway Markings
+        const markGeo = new THREE.PlaneGeometry(4, 30);
+        const markMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        for(let i = -600; i < 600; i += 80) {
+            const m = new THREE.Mesh(markGeo, markMat);
+            m.rotation.x = -Math.PI / 2;
+            m.position.set(0, 0.1, i);
+            airportGroup.add(m);
+        }
+
+        // Terminal Building
+        const termGeo = new THREE.BoxGeometry(200, 40, 80);
+        const termMat = new THREE.MeshStandardMaterial({ color: 0x334455, metalness: 0.5, roughness: 0.2 });
+        const terminal = new THREE.Mesh(termGeo, termMat);
+        terminal.position.set(-150, 20, -400);
+        terminal.castShadow = true;
+        terminal.receiveShadow = true;
+        airportGroup.add(terminal);
+
+        // Jetbridge
+        const bridgeGeo = new THREE.BoxGeometry(60, 12, 12);
+        const bridgeMat = new THREE.MeshStandardMaterial({ color: 0xdddddd });
+        const bridge = new THREE.Mesh(bridgeGeo, bridgeMat);
+        bridge.position.set(-50, 15, -400);
+        bridge.castShadow = true;
+        airportGroup.add(bridge);
+
+        scene.add(airportGroup);
+
+        // --- DETAILED BOEING EGYPTAIR MODEL ---
         const planeGroup = new THREE.Group();
-        const bodyGeo = new THREE.ConeGeometry(2, 12, 16);
-        const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.5 });
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
+
+        // White Fuselage
+        const fuseMat = new THREE.MeshStandardMaterial({ color: 0xfcfcfc, roughness: 0.2, metalness: 0.3 });
+        const blueMat = new THREE.MeshStandardMaterial({ color: 0x002D62, roughness: 0.3, metalness: 0.4 }); // EgyptAir Blue
+
+        // Body
+        const bodyGeo = new THREE.CylinderGeometry(3.5, 3.2, 45, 32);
+        const body = new THREE.Mesh(bodyGeo, fuseMat);
         body.rotation.x = Math.PI / 2;
+        body.castShadow = true;
         planeGroup.add(body);
 
-        const wingGeo = new THREE.BoxGeometry(16, 0.2, 3);
-        const wingMat = new THREE.MeshStandardMaterial({ color: 0xcccccc });
-        const wings = new THREE.Mesh(wingGeo, wingMat);
-        planeGroup.add(wings);
+        // Nose Cone
+        const noseGeo = new THREE.ConeGeometry(3.5, 10, 32);
+        const nose = new THREE.Mesh(noseGeo, fuseMat);
+        nose.rotation.x = -Math.PI / 2;
+        nose.position.z = 27.5;
+        nose.castShadow = true;
+        planeGroup.add(nose);
 
-        const tailGeo = new THREE.BoxGeometry(0.3, 3, 2);
-        const tailMat = new THREE.MeshStandardMaterial({ color: 0x002D62 });
-        const tail = new THREE.Mesh(tailGeo, tailMat);
-        tail.position.set(0, 2, -5);
+        // Cockpit Glass
+        const glassMat = new THREE.MeshStandardMaterial({ color: 0x111122, roughness: 0.1, metalness: 0.9 });
+        const glassGeo = new THREE.BoxGeometry(4, 1.8, 3);
+        const glass = new THREE.Mesh(glassGeo, glassMat);
+        glass.position.set(0, 1.8, 25);
+        planeGroup.add(glass);
+
+        // Main Wings
+        const wingShape = new THREE.Shape();
+        wingShape.moveTo(0, 0);
+        wingShape.lineTo(28, -12);
+        wingShape.lineTo(28, -18);
+        wingShape.lineTo(0, -6);
+        const extrudeSettings = { depth: 0.8, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 0.2, bevelThickness: 0.2 };
+        const wingGeo = new THREE.ExtrudeGeometry(wingShape, extrudeSettings);
+        
+        const rightWing = new THREE.Mesh(wingGeo, fuseMat);
+        rightWing.rotation.x = Math.PI / 2;
+        rightWing.position.set(0, 0, 2);
+        rightWing.castShadow = true;
+        planeGroup.add(rightWing);
+
+        const leftWing = new THREE.Mesh(wingGeo, fuseMat);
+        leftWing.rotation.x = Math.PI / 2;
+        leftWing.scale.set(-1, 1, 1);
+        leftWing.position.set(0, 0, 2);
+        leftWing.castShadow = true;
+        planeGroup.add(leftWing);
+
+        // Engines
+        const engGeo = new THREE.CylinderGeometry(1.4, 1.2, 8, 24);
+        const engMat = new THREE.MeshStandardMaterial({ color: 0xe0e0e0, metalness: 0.7, roughness: 0.2 });
+        
+        const engR = new THREE.Mesh(engGeo, engMat);
+        engR.rotation.x = Math.PI / 2;
+        engR.position.set(10, -2, 3);
+        engR.castShadow = true;
+        planeGroup.add(engR);
+
+        const engL = new THREE.Mesh(engGeo, engMat);
+        engL.rotation.x = Math.PI / 2;
+        engL.position.set(-10, -2, 3);
+        engL.castShadow = true;
+        planeGroup.add(engL);
+
+        // Tail Fin (EgyptAir Logo Blue)
+        const tailShape = new THREE.Shape();
+        tailShape.moveTo(0, 0);
+        tailShape.lineTo(0, 14);
+        tailShape.lineTo(-8, 10);
+        tailShape.lineTo(-12, 0);
+        const tailGeo = new THREE.ExtrudeGeometry(tailShape, { depth: 0.6, bevelEnabled: false });
+        const tail = new THREE.Mesh(tailGeo, blueMat);
+        tail.position.set(0, 3, -18);
+        tail.castShadow = true;
         planeGroup.add(tail);
 
-        planeGroup.position.set(0, 2, -200);
+        // Position Plane at Gate
+        planeGroup.position.set(-15, 4.2, -400);
         scene.add(planeGroup);
 
-        camera.position.set(0, 8, -220);
+        // --- 3D PASSENGERS SYSTEM ---
+        const passengersGroup = new THREE.Group();
+        const passMat = [
+            new THREE.MeshStandardMaterial({ color: 0xcc2222 }),
+            new THREE.MeshStandardMaterial({ color: 0x228822 }),
+            new THREE.MeshStandardMaterial({ color: 0x2222cc }),
+            new THREE.MeshStandardMaterial({ color: 0xf4a460 })
+        ];
+
+        function createPassenger(x, z, mat) {
+            const p = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.4, 2, 8), mat);
+            body.position.y = 1;
+            body.castShadow = true;
+            p.add(body);
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 8), new THREE.MeshStandardMaterial({ color: 0xffdbac }));
+            head.position.y = 2.3;
+            p.add(head);
+            p.position.set(x, 10, z);
+            return p;
+        }
+
+        let passengers = [];
+        for(let i=0; i<8; i++) {
+            const pass = createPassenger(-45 + (i * -4), -400, passMat[i % 4]);
+            passengersGroup.add(pass);
+            passengers.push(pass);
+        }
+        scene.add(passengersGroup);
+
+        // --- CAMERA SETUP ---
+        camera.position.set(-15, 12, -450);
         camera.lookAt(planeGroup.position);
 
-        let stage = 0;
+        // --- GAME LOGIC & PHYSICS ---
+        let gameStage = 0; // 0: GATE, 1: BOARDING, 2: TAXI/FLY
         let speed = 0;
-        let rotY = 0;
+        let alt = 4.2;
+        let steering = 0;
 
-        function animate() {
-            requestAnimationFrame(animate);
+        function handleBoarding() {
+            const btn = document.getElementById('mainActionBtn');
+            const status = document.getElementById('status-text');
 
-            if (stage === 2) {
-                planeGroup.translateZ(speed);
-                planeGroup.rotation.y += rotY;
-                rotY *= 0.9;
-
-                if (speed > 0.8) {
-                    planeGroup.position.y += (speed - 0.8) * 0.5;
-                    planeGroup.rotation.x = -0.1;
-                }
-
-                document.getElementById('spd').innerText = Math.round(speed * 100);
-                document.getElementById('alt').innerText = Math.round(planeGroup.position.y * 10);
-
-                camera.position.x = planeGroup.position.x - Math.sin(planeGroup.rotation.y) * 20;
-                camera.position.z = planeGroup.position.z - Math.cos(planeGroup.rotation.y) * 20;
-                camera.position.y = planeGroup.position.y + 7;
-                camera.lookAt(planeGroup.position);
-            }
-
-            renderer.render(scene, camera);
-        }
-
-        function nextStage() {
-            const btn = document.getElementById('mainBtn');
-            const status = document.getElementById('status');
-
-            if (stage === 0) {
-                stage = 1;
-                status.innerText = 'جاري صعود الركاب... 👥';
+            if(gameStage === 0) {
+                gameStage = 1;
+                status.innerText = "جاري صعود الركاب كابينة الطائرة...";
                 btn.style.display = 'none';
-                setTimeout(() => {
-                    status.innerText = 'اكتمل الصعود! اجهز للتأكسي والإقلاع';
-                    btn.innerText = 'بدء المحركات (Start Engines)';
-                    btn.style.display = 'block';
-                    stage = 2;
-                }, 3000);
+
+                // Animate passengers into plane
+                let step = 0;
+                const boardInterval = setInterval(() => {
+                    passengers.forEach((p) => {
+                        if(p.position.x < -15) p.position.x += 0.4;
+                        else p.visible = false;
+                    });
+                    step++;
+                    if(step > 80) {
+                        clearInterval(boardInterval);
+                        status.innerText = "اكتمل الصعود! الطائرة جاهزة للقيادة";
+                        btn.innerText = "بدء التأكسي (Taxiing)";
+                        btn.style.display = 'block';
+                        gameStage = 2;
+                    }
+                }, 50);
+            } else if(gameStage === 2) {
+                status.innerText = "في مرحلة التأكسي... اتجه للممر";
+                btn.style.display = 'none';
             }
         }
 
-        function throttleUp() {
-            if (stage === 2 && speed < 1.5) speed += 0.2;
+        function addThrottle() {
+            if(gameStage === 2 && speed < 2.5) speed += 0.3;
         }
 
         function steer(val) {
-            if (stage === 2) rotY -= val;
+            if(gameStage === 2) steering -= val;
+        }
+
+        // --- ANIMATION LOOP ---
+        let clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+
+            // Wave movement for sea
+            seaMat.roughness = 0.1 + Math.sin(time) * 0.05;
+
+            if(gameStage === 2) {
+                // Plane Physics
+                planeGroup.translateZ(speed);
+                planeGroup.rotation.y += steering;
+                steering *= 0.88; // Damping
+
+                // Takeoff Logic
+                if(speed > 1.2) {
+                    planeGroup.position.y += (speed - 1.2) * 0.8;
+                    planeGroup.rotation.x = -Math.min((speed - 1.2) * 0.1, 0.25);
+                }
+
+                speed *= 0.992; // Friction
+
+                // HUD Update
+                document.getElementById('spdVal').innerText = Math.round(speed * 120);
+                document.getElementById('altVal').innerText = Math.round((planeGroup.position.y - 4.2) * 20);
+
+                // Dynamic Camera Following
+                const camOffset = new THREE.Vector3(0, 12, -45);
+                camOffset.applyQuaternion(planeGroup.quaternion);
+                camera.position.copy(planeGroup.position).add(camOffset);
+                camera.lookAt(planeGroup.position.clone().add(new THREE.Vector3(0, 3, 20).applyQuaternion(planeGroup.quaternion)));
+            }
+
+            renderer.render(scene, camera);
         }
 
         window.addEventListener('resize', () => {
