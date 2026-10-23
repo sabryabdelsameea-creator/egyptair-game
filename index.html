@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>محاكي طيران مصر للطيران - 3D Flight Sim</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
+        #ui { position: absolute; top: 15px; right: 15px; left: 15px; z-index: 100; display: flex; justify-content: space-between; pointer-events: none; }
+        .panel { background: rgba(0, 0, 0, 0.75); color: #fff; padding: 12px; border-radius: 10px; border: 1px solid #D4AF37; pointer-events: auto; }
+        button { background: #D4AF37; color: #002D62; border: none; padding: 10px 15px; font-weight: bold; border-radius: 5px; cursor: pointer; margin-top: 5px; width: 100%; }
+        #controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; gap: 10px; pointer-events: auto; }
+        .ctrl-btn { background: rgba(0, 45, 98, 0.8); color: white; border: 1px solid #D4AF37; width: 60px; height: 60px; border-radius: 50%; font-size: 20px; font-weight: bold; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="ui">
+        <div class="panel">
+            <h3 style="margin:0; color:#D4AF37;">✈️ مصر للطيران</h3>
+            <p id="status" style="margin:5px 0;">الوضعية: عند البوابة (Gate)</p>
+            <button id="mainBtn" onclick="nextStage()">بدء صعود الركاب (Boarding)</button>
+        </div>
+        <div class="panel">
+            <p style="margin:2px 0;">السرعة: <span id="spd">0</span> عقدة</p>
+            <p style="margin:2px 0;">الارتفاع: <span id="alt">0</span> قدم</p>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button class="ctrl-btn" onclick="steer(-0.05)">◀</button>
+        <button class="ctrl-btn" onclick="throttleUp()">▲</button>
+        <button class="ctrl-btn" onclick="steer(0.05)">▶</button>
+    </div>
+
+    <script>
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb);
+        scene.fog = new THREE.FogExp2(0x87ceeb, 0.002);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        const light = new THREE.DirectionalLight(0xffffff, 1.2);
+        light.position.set(100, 150, 50);
+        light.castShadow = true;
+        scene.add(light);
+        scene.add(new THREE.AmbientLight(0x666666));
+
+        const seaGeo = new THREE.PlaneGeometry(2000, 2000);
+        const seaMat = new THREE.MeshPhongMaterial({ color: 0x006699, shininess: 80 });
+        const sea = new THREE.Mesh(seaGeo, seaMat);
+        sea.rotation.x = -Math.PI / 2;
+        sea.position.y = -1;
+        scene.add(sea);
+
+        const runwayGeo = new THREE.PlaneGeometry(80, 800);
+        const runwayMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        const runway = new THREE.Mesh(runwayGeo, runwayMat);
+        runway.rotation.x = -Math.PI / 2;
+        runway.position.set(0, 0, 0);
+        scene.add(runway);
+
+        const planeGroup = new THREE.Group();
+        const bodyGeo = new THREE.ConeGeometry(2, 12, 16);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.5 });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        body.rotation.x = Math.PI / 2;
+        planeGroup.add(body);
+
+        const wingGeo = new THREE.BoxGeometry(16, 0.2, 3);
+        const wingMat = new THREE.MeshStandardMaterial({ color: 0xcccccc });
+        const wings = new THREE.Mesh(wingGeo, wingMat);
+        planeGroup.add(wings);
+
+        const tailGeo = new THREE.BoxGeometry(0.3, 3, 2);
+        const tailMat = new THREE.MeshStandardMaterial({ color: 0x002D62 });
+        const tail = new THREE.Mesh(tailGeo, tailMat);
+        tail.position.set(0, 2, -5);
+        planeGroup.add(tail);
+
+        planeGroup.position.set(0, 2, -200);
+        scene.add(planeGroup);
+
+        camera.position.set(0, 8, -220);
+        camera.lookAt(planeGroup.position);
+
+        let stage = 0;
+        let speed = 0;
+        let rotY = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (stage === 2) {
+                planeGroup.translateZ(speed);
+                planeGroup.rotation.y += rotY;
+                rotY *= 0.9;
+
+                if (speed > 0.8) {
+                    planeGroup.position.y += (speed - 0.8) * 0.5;
+                    planeGroup.rotation.x = -0.1;
+                }
+
+                document.getElementById('spd').innerText = Math.round(speed * 100);
+                document.getElementById('alt').innerText = Math.round(planeGroup.position.y * 10);
+
+                camera.position.x = planeGroup.position.x - Math.sin(planeGroup.rotation.y) * 20;
+                camera.position.z = planeGroup.position.z - Math.cos(planeGroup.rotation.y) * 20;
+                camera.position.y = planeGroup.position.y + 7;
+                camera.lookAt(planeGroup.position);
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function nextStage() {
+            const btn = document.getElementById('mainBtn');
+            const status = document.getElementById('status');
+
+            if (stage === 0) {
+                stage = 1;
+                status.innerText = 'جاري صعود الركاب... 👥';
+                btn.style.display = 'none';
+                setTimeout(() => {
+                    status.innerText = 'اكتمل الصعود! اجهز للتأكسي والإقلاع';
+                    btn.innerText = 'بدء المحركات (Start Engines)';
+                    btn.style.display = 'block';
+                    stage = 2;
+                }, 3000);
+            }
+        }
+
+        function throttleUp() {
+            if (stage === 2 && speed < 1.5) speed += 0.2;
+        }
+
+        function steer(val) {
+            if (stage === 2) rotY -= val;
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
